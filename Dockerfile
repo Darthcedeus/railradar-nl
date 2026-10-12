@@ -16,6 +16,7 @@ RUN npm ci --omit=dev && npm cache clean --force && mkdir /data && chown node:no
 COPY --from=build /app/dist ./dist
 COPY server ./server
 COPY tracker/*.mjs ./tracker/
+RUN chmod -R a+rX /app/server /app/tracker /app/dist && chmod a+r /app/package.json /app/package-lock.json
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD node -e "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
