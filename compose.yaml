@@ -1,0 +1,25 @@
+services:
+  railradar:
+    build: .
+    platform: linux/amd64
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APP_ORIGIN: https://trein.humza.xyz
+      DATA_DIR: /data
+      PORT: "3000"
+    ports:
+      - "${TAILSCALE_BIND_IP:?Set your Ubuntu VM Tailscale IPv4 in .env}:3000:3000"
+    volumes:
+      - railradar_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+volumes:
+  railradar_data:
