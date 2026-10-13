@@ -5,11 +5,11 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      APP_ORIGIN: https://trein.humza.xyz
+      APP_ORIGIN: ${APP_ORIGIN:?Set your public HTTPS origin in .env}
       DATA_DIR: /data
       PORT: "3000"
     ports:
-      - "${TAILSCALE_BIND_IP:?Set your Ubuntu VM Tailscale IPv4 in .env}:3000:3000"
+      - "${BIND_IP:-127.0.0.1}:3000:3000"
     volumes:
       - railradar_data:/data
     read_only: true

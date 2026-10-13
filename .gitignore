@@ -11,3 +11,9 @@ backups/
 *.db-*
 *.log
 *.zip
+
+# Local deployment configuration
+compose.*.yaml
+compose.*.yml
+Caddyfile
+Caddyfile.local*

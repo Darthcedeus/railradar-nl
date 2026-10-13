@@ -10,7 +10,7 @@ test('anonymous device sessions expire and reject tampering',()=>{
 });
 test('public map, CSRF, device isolation, recovery and push lifecycle',async t=>{
  const store=openStore(':memory:',()=>({publicKey:'public-fixture',privateKey:'private-fixture'}));let pushes=0;
- const origin='https://trein.humza.xyz';
+ const origin='https://railradar.example.com';
  const server=createApp({config:{origin,sessionSecret:secret},store,ns:async()=>Response.json({payload:[]}),monitor:{status:()=>({checkedAt:null})},sendPush:async()=>{pushes++;}});
  server.listen(0,'127.0.0.1');await once(server,'listening');
  t.after(()=>{server.closeAllConnections();server.close();store.db.close();});
