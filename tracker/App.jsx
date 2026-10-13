@@ -151,7 +151,7 @@ export default function App() {
   const routeColor = trainStyle(selectedTrain?.type).color;
   const upcoming = nextCall(routeState.stops, clock);
   return <div className="app"><header><div className="brand"><TrainFront size={25}/><div><b>RailRadar <span>NL</span></b><small>Netherlands · passenger train tracker</small></div></div><span className={`status ${live ? 'live' : ''}`} role="status">{live ? '● NS LIVE FEED' : feed.status === 'connecting' ? '● CONNECTING' : feed.status === 'stale' ? '● STALE POSITIONS' : '● FEED UNAVAILABLE'}</span></header>
-    <main><section className="map" aria-label="Train map"><MapContainer center={HAGUE} zoom={12} style={{ height: '100%', width: '100%' }}><TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/><MapActions center={area.center} onSearchHere={setViewport}/>
+    <main><section className="map" aria-label="Train map"><MapContainer center={HAGUE} zoom={12} style={{ height: '100%', width: '100%' }}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" referrerPolicy="strict-origin-when-cross-origin"/><MapActions center={area.center} onSearchHere={setViewport}/>
       {(showTracks || showCrossings) && <RailInfrastructure tracks={showTracks} crossings={showCrossings} onStatus={setRailStatus}/>}
       {showInternational && <International stations={stations} onSelect={setSelected}/>}
       <Circle center={area.center} radius={radius} pathOptions={{ color: '#137e80', fillOpacity: .025, weight: 1, dashArray: '5 6' }}/>

@@ -46,4 +46,7 @@ test('public map, CSRF, device isolation, recovery and push lifecycle',async t=>
  assert.equal((await call('/%2e%2e%2f.env')).status,404);
  assert.equal((await call('/sw.js')).status,200);assert.equal((await call('/manifest.webmanifest')).status,200);
  const shell=await call('/');assert.equal(shell.status,200);assert.match(shell.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+ // OSM requires a real website Referer; cross-origin tiles receive the origin only.
+ assert.equal(shell.headers.get('referrer-policy'),'strict-origin-when-cross-origin');
+ assert.ok(shell.headers.get('content-security-policy').split(';').find(d=>d.trim().startsWith('img-src ')).split(/\s+/).includes('https://tile.openstreetmap.org'));
 });
