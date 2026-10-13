@@ -1,5 +1,6 @@
 import { normalizeVehicles, distance } from '../tracker/data.mjs';
 import { approaching } from './alerts.mjs';
+import { destinationResolver } from './destinations.mjs';
 export function createMonitor({ store, ns, sendPush, interval = 30000, now = Date.now }) {
   const snapshots = new Map(); let running = false, timer, stopped = true;
   let status = { checkedAt: null, successAt: null, error: null, intervalSeconds: interval / 1000 };
@@ -8,6 +9,7 @@ export function createMonitor({ store, ns, sendPush, interval = 30000, now = Dat
     running = true;
     try {
       const devices = store.devices(); const at = now(); const active = new Set(devices.map(d => d.id));
+      const resolveDestination = destinationResolver(ns);
       for (const id of snapshots.keys()) if (!active.has(id)) snapshots.delete(id);
       const groups = new Map();
       for (const device of devices) {
@@ -30,10 +32,12 @@ export function createMonitor({ store, ns, sendPush, interval = 30000, now = Dat
           for (const train of trains) {
             if (JSON.stringify(store.get(device.id)?.rule) !== ruleKey) break;
             if (previous?.ruleKey !== ruleKey || !approaching(train, previous.trains.get(train.id), device.rule, sampledAt, interval * 2 + 30000) || !store.eligible(device.id, train.id, sampledAt)) continue;
+            const destination = await resolveDestination(train.number);
+            if (JSON.stringify(store.get(device.id)?.rule) !== ruleKey) break;
             store.mark(device.id, train.id, sampledAt);
             const km = (distance([device.rule.lat, device.rule.lng], train.pos) / 1000).toFixed(1);
             try {
-              await sendPush(device.subscription, { title: `${train.name} approaching your area`, body: `About ${km} km from ${device.rule.label}. Reported movement is toward your area; exact passage is not guaranteed.`, tag: `train-${train.id}` });
+              await sendPush(device.subscription, { title: destination ? `${train.name} → ${destination}` : `${train.name} · destination unavailable`, body: `Approaching your area · about ${km} km from ${device.rule.label}. Reported movement is toward your area; exact passage is not guaranteed.`, tag: `train-${train.id}` });
             } catch (err) {
               if ([404, 410].includes(err.statusCode)) { store.remove(device.id); break; }
               store.unmark(device.id, train.id); error = 'A push delivery failed; monitoring will retry when eligible.';

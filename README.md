@@ -101,6 +101,8 @@ The saved location is fixed: the app does not follow your iPhone in the backgrou
 
 ## Alert behaviour and limits
 
+Passing-train notifications include the train name/number and the final destination from its NS journey, for example **IC 1234 → Amsterdam Centraal**. Only alert-eligible trains trigger a journey lookup; lookups are shared across devices within a cycle and use the API cache. Station names are resolved from the station catalogue when necessary. This adds journey requests to your NS quota. Missing, cancelled, incomplete or unavailable terminal information is shown as **destination unavailable**; the alert is still sent. Destination enrichment waits at most five seconds per distinct eligible train. No phone resubscription is needed after updating.
+
 - Default polling: **30 seconds after each cycle completes** while at least one device is enabled. Change `POLL_SECONDS` in `.env` to 15–300 and recreate the container. This is best-effort, not real-time or a delivery guarantee.
 - Per distinct saved coordinate pair, one NS request per polling cycle (plus interactive map/route/departure traffic). Start with one location. At 30 seconds, continuous monitoring is roughly 2,880 requests/day/location before caching and cycle duration; confirm your NS subscription allowance and adjust polling as needed. Requests for identical saved coordinates share a fetch.
 - Needs two fresh successful samples. A train must be within the selected 1–5 km radius and move at least 30 metres toward the saved point. Stationary trains, stale sample gaps, implausible jumps and receding trains are skipped. After a feed failure or restart, it waits for a new baseline.

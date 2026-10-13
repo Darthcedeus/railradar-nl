@@ -56,3 +56,19 @@ test('per-device hourly limit bounds notification volume',()=>{
  const store=openStore(':memory:',keys);store.save(device());for(let n=0;n<30;n++)store.mark(device().id,String(n),1000000);
  assert.equal(store.eligible(device().id,'new',1001000),false);assert.equal(store.eligible(device().id,'new',5000000),true);store.db.close();
 });
+test('approach notification includes final destination and falls back without losing the alert',async()=>{
+ for(const destination of ['Amsterdam Centraal',null]) {
+  const store=openStore(':memory:',keys);store.save(device());let at=1000000,lat=52.03;const sent=[];let lookups=0;
+  const ns=async req=>{
+   if(new URL(req.url).pathname==='/api/journey') {lookups++;return destination?Response.json({payload:{stops:[{stop:{name:destination},arrivals:[{}],departures:[]}]}}):Response.json({}, {status:503});}
+   return Response.json({payload:{treinen:[{treinNummer:100,type:'IC',lat,lng:5,snelheid:100}]}});
+  };
+  const monitor=createMonitor({store,ns,now:()=>at,sendPush:async(_,payload)=>sent.push(payload)});
+  await monitor.tick();assert.equal(lookups,0);
+  at+=30000;lat=52.02;await monitor.tick();assert.equal(sent.length,1);
+  assert.equal(sent[0].title,destination?'IC 100 → Amsterdam Centraal':'IC 100 · destination unavailable');
+  assert.match(sent[0].body,/Approaching your area/);assert.equal(sent[0].tag,'train-100');
+  at+=30000;lat=52.01;await monitor.tick();assert.equal(sent.length,1);assert.equal(lookups,1);
+  store.db.close();
+ }
+});
