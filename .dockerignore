@@ -12,3 +12,9 @@ backups
 tests
 scripts
 README.md
+
+# Local deployment configuration
+compose.*.yaml
+compose.*.yml
+Caddyfile
+Caddyfile.local*

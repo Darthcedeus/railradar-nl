@@ -1,7 +1,8 @@
-# On your EXISTING Caddy VM, add this site block to its existing Caddyfile.
-# Replace APP_VM_TAILSCALE_IP with the Ubuntu app VM's actual 100.x.y.z address.
-trein.humza.xyz {
+# Example for a reverse proxy running directly on the same host.
+# Replace the example hostname with your own public hostname.
+# For a remote or containerized proxy, use a reachable private upstream.
+railradar.example.com {
     encode zstd gzip
-    reverse_proxy http://APP_VM_TAILSCALE_IP:3000
+    reverse_proxy http://127.0.0.1:3000
     header Strict-Transport-Security "max-age=31536000"
 }
