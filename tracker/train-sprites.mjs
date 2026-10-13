@@ -22,50 +22,104 @@ export function withHeadings(trains, previous = [], elapsedMs) {
 export const directionIndex = heading => Number.isFinite(heading) ? Math.round(((heading % 360) + 360) % 360 / 45) % 8 : 3;
 export const headingLabel = heading => Number.isFinite(heading) ? `Last movement: ${['N','NE','E','SE','S','SW','W','NW'][directionIndex(heading)]} (estimated)` : 'Direction not yet known';
 
-// Eight separately projected views, not a rotated flat image: the roof stays on top.
+// Orthographic, elevated views of a coupled two-car train. All geometry is local
+// to the train; its roof remains upright as the eight bearing views change.
 export function trainSprite(type, heading, selected = false) {
   const { key } = trainStyle(type);
-  const palette = {
-    intercity: ['#ffd43b','#fff0a6','#dba719','#0960a0'],
-    sprinter: ['#f0f7fc','#ffffff','#bacbdc','#1678bb'],
-    international: ['#e4e9f0','#ffffff','#a9b7c7','#c73150'],
-    regional: ['#def4ed','#f4fff9','#8cc4b3','#137b68']
+  const [body, dark, roof, stripe] = {
+    intercity: ['#ffca28', '#c38b13', '#fff1aa', '#1556a0'],
+    sprinter: ['#f3f7fb', '#a9becd', '#ffffff', '#1978bb'],
+    international: ['#eff1f4', '#a4b2c1', '#ffffff', '#d72f46'],
+    regional: ['#e6f5ef', '#89b8aa', '#f7fffb', '#128879']
   }[key];
-  const [body, roof, shade, stripe] = palette, angle = directionIndex(heading) * Math.PI / 4;
-  const dx = Math.sin(angle), dy = -Math.cos(angle), px = Math.cos(angle), py = Math.sin(angle);
-  const height = key === 'intercity' ? 17 : 13, length = key === 'international' ? 29 : 26, half = 8;
-  const point = (along, across, z = 0) => [40 + dx * along + px * across, 40 + dy * along + py * across - z];
-  const coords = points => points.map(p => p.map(n => n.toFixed(2)).join(',')).join(' ');
-  const poly = (points, fill, stroke = '#29425b', width = .8) => `<polygon points="${coords(points)}" fill="${fill}" stroke="${stroke}" stroke-width="${width}" stroke-linejoin="round"/>`;
-  const nose = key === 'international' ? 9 : 4;
-  const footprint = [[-length,-half],[length-nose,-half],[length, -half*.52],[length,half*.52],[length-nose,half],[-length,half]];
-  const ground = footprint.map(([x,y]) => point(x,y)), top = footprint.map(([x,y],i) => point(x,y,(i===2||i===3)?height-4:height));
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80" aria-hidden="true">`;
-  if (selected) svg += '<ellipse cx="40" cy="43" rx="35" ry="29" fill="#fff" fill-opacity=".7" stroke="#128c99" stroke-width="2" stroke-dasharray="3 3"/>';
-  svg += poly(ground.map(([x,y])=>[x+2,y+4]), '#132a46', 'none').replace('fill="#132a46"', 'fill="#132a46" fill-opacity=".2"');
-  const faces = footprint.map((p,i)=>({i,j:(i+1)%footprint.length})).filter(({i,j}) => ground[j][0]-ground[i][0] < -.01).sort((a,b)=>(ground[a.i][1]+ground[a.j][1])-(ground[b.i][1]+ground[b.j][1]));
-  for (const {i,j} of faces) {
-    svg += poly([ground[i],ground[j],top[j],top[i]], i===5?shade:body);
-    const lerp=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
-    const wall=(t,z)=>lerp(lerp(ground[i],ground[j],t),lerp(top[i],top[j],t),z);
-    svg += poly([wall(0,.18),wall(1,.18),wall(1,.36),wall(0,.36)],stripe,'none');
-    if (i===0||i===4) {
-      for(const t of [.18,.72]) {const p=wall(t,0);svg+=`<ellipse cx="${p[0]}" cy="${p[1]+1}" rx="3.4" ry="2.4" fill="#203247" stroke="#718193" stroke-width=".8"/>`;}
-      for(const t of [.12,.3,.48,.66,.84]) {
-        const row=(low,high)=>poly([wall(t,low),wall(t+.10,low),wall(t+.10,high),wall(t,high)],'#183e5d','#8ad0e3',.4);
-        svg+=row(key==='intercity'?.62:.5,.86);
-        if(key==='intercity')svg+=row(.27,.5);
+  const angle = directionIndex(heading) * Math.PI / 4;
+  const dx = Math.sin(angle), dy = -Math.cos(angle);
+  const px = Math.cos(angle), py = Math.sin(angle);
+  const height = key === 'intercity' ? 17 : 13;
+  const half = 5.8, nose = key === 'international' ? 12 : 7;
+  const point = (x, y, z = 0) => [64 + dx*x + px*y, 65 + (dy*x + py*y)*.68 - z];
+  const coords = ps => ps.map(p => p.map(n => n.toFixed(2)).join(',')).join(' ');
+  const poly = (ps, fill, stroke = '#35495a', width = .55) =>
+    `<polygon points="${coords(ps)}" fill="${fill}" stroke="${stroke}" stroke-width="${width}" stroke-linejoin="round"/>`;
+  const line = (ps, stroke, width = .65) =>
+    `<polyline points="${coords(ps)}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const dot = (p, r, fill) => `<circle cx="${p[0]}" cy="${p[1]}" r="${r}" fill="${fill}"/>`;
+  const lerp = (a,b,t) => a.map((v,i)=>v+(b[i]-v)*t);
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 112" width="128" height="112" aria-hidden="true">';
+  if (selected) svg += '<ellipse cx="64" cy="65" rx="55" ry="38" fill="#e4fbff" fill-opacity=".65" stroke="#128c99" stroke-width="1.6" stroke-dasharray="3 4"/>';
+  // Shadow and the flexible gangway join the cars into one train silhouette.
+  svg += '<g opacity=".18">' + poly([point(-49,-7),point(49,-7),point(49,7),point(-49,7)].map(([x,y])=>[x+2,y+4]), '#20374d','none') + '</g>';
+  svg += poly([point(-3,-4,3),point(3,-4,3),point(3,4,3),point(-3,4,3)],'#243645');
+  svg += poly([point(-3,-4,height-2),point(3,-4,height-2),point(3,4,height-2),point(-3,4,height-2)],'#4b5b66');
+  // Draw the further carriage first so the nearer carriage correctly occludes it.
+  const cars = [{a:-47,b:-2,cab:false},{a:2,b:47,cab:true}]
+    .sort((a,b)=>dy*((a.a+a.b)-(b.a+b.b)));
+  for (const car of cars) {
+    const {a,b,cab} = car;
+    const shoulder = cab ? b-nose : b-2;
+    const footprint = [[a,-half],[shoulder,-half],[b,-half*.45],[b,half*.45],[shoulder,half],[a,half]];
+    const topZ = i => cab && (i===2||i===3) ? 7.5 : height;
+    const ground = footprint.map(([x,y])=>point(x,y,3));
+    const top = footprint.map(([x,y],i)=>point(x,y,topZ(i)));
+    // Bogies: two pairs of small steel wheels beneath each carriage, not bus tyres.
+    for (const x of [a+8,b-10]) {
+      svg += poly([point(x-4,-4,2),point(x+4,-4,2),point(x+4,4,2),point(x-4,4,2)],'#1b2b39');
+      for (const side of [-1,1]) for (const offset of [-2.5,2.5]) {
+        const p=point(x+offset,side*half,1.7);
+        svg += `<ellipse cx="${p[0]}" cy="${p[1]}" rx="1.6" ry="1.7" fill="#283747" stroke="#8b9ba8" stroke-width=".45"/>`;
       }
-    } else {
-      svg+=poly([wall(.15,.5),wall(.85,.5),wall(.85,.85),wall(.15,.85)],'#183e5d','#82c8da',.4);
-      for(const t of [.2,.8]) {const p=wall(t,.22);svg+=`<circle cx="${p[0]}" cy="${p[1]}" r="1.2" fill="${i===5?'#fa5b61':'#fff6b0'}"/>`;}
+    }
+    const faces = footprint.map((_,i)=>({i,j:(i+1)%6}))
+      .filter(({i,j})=>ground[j][0]-ground[i][0]<-.001)
+      .sort((a,b)=>(ground[a.i][1]+ground[a.j][1])-(ground[b.i][1]+ground[b.j][1]));
+    for (const {i,j} of faces) {
+      const wall=(t,z)=>lerp(lerp(ground[i],ground[j],t),lerp(top[i],top[j],t),z);
+      svg += poly([ground[i],ground[j],top[j],top[i]], i===4||i===5 ? dark : body);
+      const band=(lo,hi,fill)=>poly([wall(0,lo),wall(1,lo),wall(1,hi),wall(0,hi)],fill,'none');
+      svg += band(0,.13,'#445767');
+      svg += band(.23,key==='intercity'?.52:.35,stripe);
+      if(i===0||i===4) {
+        // Continuous rows of narrow rail windows and inset double doors.
+        for(const t of [.10,.24,.38,.52,.66,.80]) {
+          const win=(lo,hi)=>poly([wall(t,lo),wall(t+.085,lo),wall(t+.085,hi),wall(t,hi)],'#16354c','#7bafc4',.25);
+          svg += win(key==='intercity'?.66:.52,.87);
+          if(key==='intercity') svg += win(.29,.47);
+        }
+        for(const t of [.025,.91]) {
+          svg += poly([wall(t,.15),wall(t+.065,.15),wall(t+.065,.88),wall(t,.88)],body,'#687e88',.35);
+          svg += line([wall(t+.033,.16),wall(t+.033,.85)],'#687e88',.3);
+        }
+        svg += line([wall(0,.95),wall(1,.95)],roof,.65);
+      } else if(cab && i!==5) {
+        for(const t of [.18,.82]) svg += dot(wall(t,.35),.85,'#fff7cc');
+      } else {
+        svg += poly([wall(.18,.15),wall(.82,.15),wall(.82,.85),wall(.18,.85)],'#394d5e');
+        if(!cab && i===5) for(const t of [.12,.88]) svg += dot(wall(t,.32),.7,'#f76b62');
+      }
+    }
+    // Crown and bevels give the roof actual volume, rather than a flat bus roof.
+    const crown=footprint.map(([x,y],i)=>point(x,y*.68,topZ(i)+1.5));
+    svg += poly(top,roof);
+    for(let i=0;i<6;i++) svg += poly([top[i],top[(i+1)%6],crown[(i+1)%6],crown[i]],i<3?roof:body,'#7d8b91',.25);
+    svg += poly(crown,roof,'#87959c',.35);
+    const roofEnd=cab?shoulder-2:b-4;
+    svg += line([point(a+3,0,height+1.7),point(roofEnd,0,height+1.7)],'#c3cdd1',.6);
+    // HVAC housing plus a raised diamond pantograph are recognisable rail details.
+    const vent=a+7;
+    svg += poly([point(vent,-3,height+1.6),point(vent+8,-3,height+1.6),point(vent+8,3,height+1.6),point(vent,3,height+1.6)],'#8f9fa9','#677b89',.4);
+    for(let x=vent+1;x<vent+8;x+=1.5) svg+=line([point(x,-2.3,height+1.7),point(x,2.3,height+1.7)],'#dae2e6',.4);
+    if(!cab) {
+      const x=b-11, z=height+2;
+      svg += line([point(x-4,0,z),point(x,0,z+5),point(x+5,0,z+2),point(x,0,z),point(x-4,0,z)],'#374755',.9);
+      svg += line([point(x,-4,z+5),point(x,4,z+5)],'#263847',1.1);
+    }
+    if(cab) {
+      // Slanted panoramic cab glass, tapered nose, and a central coupler.
+      svg += poly([point(shoulder-1,-4,height+1.7),point(b-3,-2.9,9.7),point(b-3,2.9,9.7),point(shoulder-1,4,height+1.7)],'#17394f','#86b5c9',.6);
+      svg += line([point(shoulder,0,height+1.8),point(b-3,0,9.8)],'#789ead',.4);
+      svg += line([point(b-3,-2.6,8.7),point(b-1,0,7.9),point(b-3,2.6,8.7)],stripe,1.5);
+      svg += line([point(b,0,3.5),point(b+2,0,3.5)],'#263847',1.5);
     }
   }
-  svg += poly(top,roof,'#38536c',.8);
-  // Roof stripe and equipment add depth without external raster assets.
-  svg += poly([point(-length+5,-2,height+.2),point(length-nose-3,-2,height+.2),point(length-nose-3,2,height+.2),point(-length+5,2,height+.2)],body,'none');
-  svg += poly([point(-7,-3,height+.5),point(3,-3,height+.5),point(3,3,height+.5),point(-7,3,height+.5)],'#92a8b8','#627d91',.5);
-  // Sloping cab windshield is part of the roof and always points toward the nose.
-  svg += poly([point(length-nose-2,-5,height+.4),point(length-1,-3,height-3.4),point(length-1,3,height-3.4),point(length-nose-2,5,height+.4)],'#214a67','#92d6e5',.6);
   return svg+'</svg>';
 }

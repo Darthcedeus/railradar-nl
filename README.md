@@ -6,6 +6,8 @@ Train markers now use shaded isometric vector sprites: yellow/blue double-deck I
 
 ## Architecture
 
+The revised markers depict two coupled railcars with narrow steel-wheel bogies, gangways, bevelled roofs, rooftop equipment and a raised pantograph. Intercity units have two window decks; international units have a longer sloped cab. Marker artwork is 84 × 74 pixels with its geographic anchor at the centre of the train's footprint.
+
 - Your existing **Caddy VM** terminates public HTTPS and proxies through Tailscale to the **Ubuntu app VM**, port 3000.
 - One Node 24 container serves the public React frontend and train API, plus a background monitoring loop. The monitor runs even when every browser is closed; it is not a browser timer or ChatGPT task.
 - A persistent Docker volume holds SQLite data: device subscriptions, saved locations, VAPID keys and duplicate-alert history. No additional database container is needed. Run exactly one application replica.
