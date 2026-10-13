@@ -36,8 +36,9 @@ export function createMonitor({ store, ns, sendPush, interval = 30000, now = Dat
             if (JSON.stringify(store.get(device.id)?.rule) !== ruleKey) break;
             store.mark(device.id, train.id, sampledAt);
             const km = (distance([device.rule.lat, device.rule.lng], train.pos) / 1000).toFixed(1);
+            const speed = Number.isFinite(train.speed) && train.speed >= 0 ? `${Math.round(train.speed)} km/h` : 'Speed unavailable';
             try {
-              await sendPush(device.subscription, { title: destination ? `${train.name} → ${destination}` : `${train.name} · destination unavailable`, body: `Approaching your area · about ${km} km from ${device.rule.label}. Reported movement is toward your area; exact passage is not guaranteed.`, tag: `train-${train.id}` });
+              await sendPush(device.subscription, { title: destination ? `${train.name} → ${destination}` : `${train.name} · destination unavailable`, body: `${speed} · Approaching your area · about ${km} km from ${device.rule.label}. Reported movement is toward your area; exact passage is not guaranteed.`, tag: `train-${train.id}` });
             } catch (err) {
               if ([404, 410].includes(err.statusCode)) { store.remove(device.id); break; }
               store.unmark(device.id, train.id); error = 'A push delivery failed; monitoring will retry when eligible.';
