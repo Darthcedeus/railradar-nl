@@ -9,7 +9,7 @@ services:
       DATA_DIR: /data
       PORT: "3000"
     ports:
-      - "${BIND_IP:-127.0.0.1}:3000:3000"
+      - "${BIND_IP:-127.0.0.1}:${HOST_PORT:-3000}:3000"
     volumes:
       - railradar_data:/data
     read_only: true

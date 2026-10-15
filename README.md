@@ -27,7 +27,8 @@ Setup asks for the public HTTPS origin, host bind IPv4, and NS subscription key.
 | Variable | Purpose |
 | --- | --- |
 | `APP_ORIGIN` | Required public HTTPS origin, without a trailing slash or path. |
-| `BIND_IP` | Host interface for the published app port; defaults to `127.0.0.1`. |
+| `BIND_IP` | Host interface for the published app port; defaults to `127.0.0.1`. Use the VM's Tailscale/private IP when the proxy runs on another machine. |
+| `HOST_PORT` | Host port the app is published on; defaults to `3000`. The container always listens on 3000 internally. |
 | `NS_API_SUBSCRIPTION_KEY` | NS API credential. |
 | `SESSION_SECRET` | Stable, random 64-character lowercase hexadecimal secret. |
 | `POLL_SECONDS` | Monitor interval, 15–300 seconds; default 30. |
