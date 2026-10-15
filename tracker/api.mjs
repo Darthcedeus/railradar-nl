@@ -60,7 +60,11 @@ export function createHandler({ key, fetcher = fetch, now = Date.now } = {}) {
       if (url.pathname === '/api/vehicles') {
         const { lat, lng, radius } = area(url);
         upstream = new URL('/virtual-train-api/vehicle', NS_BASE);
-        for (const [k, v] of Object.entries({ lat, lng, radius, limit: 300 })) upstream.searchParams.set(k, String(v));
+        // Snap to a ~1 km grid and widen the radius to compensate, so nearby map
+        // searches share one cached NS request instead of each costing quota.
+        // Callers filter results by their exact distance.
+        const snap = v => (Math.round(v * 100) / 100).toFixed(2);
+        for (const [k, v] of Object.entries({ lat: snap(lat), lng: snap(lng), radius: Math.min(radius + 1000, 30000), limit: 300 })) upstream.searchParams.set(k, String(v));
         ttl = 8000; kind = 'vehicles';
       } else if (url.pathname === '/api/journey') {
         const train = url.searchParams.get('train');

@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { MapContainer, TileLayer, Marker, Popup, Circle, CircleMarker, Polyline, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -17,6 +17,8 @@ import { HAGUE, normalizeVehicles, distance } from './data.mjs';
 
 const stationIcon = L.divIcon({ className: 'station-icon', html: '<span>●</span>', iconSize: [18, 18] });
 
+const speedText = (speed, unknown = 'Speed unknown') => speed === null ? unknown : `${Math.round(speed)} km/h`;
+const FILTERS = [['All', 'All'], ['Intercity', 'Intercity'], ['Sprinter', 'Sprinter'], ['International', 'International'], ['Other passenger', 'Other']];
 const time = value => value ? new Date(value).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' }) : '—';
 async function api(path, signal) {
   const response = await fetch(path, { signal });
@@ -24,9 +26,10 @@ async function api(path, signal) {
   if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
   return body;
 }
-function MapActions({ center, onSearchHere }) {
+function MapActions({ center, radius, onSearchHere }) {
   const map = useMap();
-  useEffect(() => { map.flyTo(center, 12); }, [map, center]);
+  // Zoom so the whole search circle (3, 12 or 30 km) is visible.
+  useEffect(() => { map.flyToBounds(L.latLng(center).toBounds(radius * 2), { padding: [10, 10], maxZoom: 15 }); }, [map, center, radius]);
   useMapEvents({ moveend: () => { const c = map.getCenter(); onSearchHere([c.lat, c.lng]); } });
   return null;
 }
@@ -46,7 +49,7 @@ function Journey({ train, stations, state, onClose, onFit, hasRoute, upcoming })
   const stopName = s => names.get(String(s?.stop?.uicCode)) || s?.stop?.name || s?.stop?.code || 'Unknown station';
   const track = platform(upcoming?.event);
   const following = upcoming?.action === 'Departs' ? nextCall(state.stops?.slice(upcoming.index + 1)) : null;
-  return <section className="journey" aria-label="Train details"><div className="trainhead"><h2>{train.name}</h2><button onClick={onClose} aria-label="Close train details">×</button></div><p>Speed: {train.speed === null ? 'Unknown' : `${train.speed} km/h`} · {train.source}</p>
+  return <section className="journey" aria-label="Train details"><div className="trainhead"><h2>{train.name}</h2><button onClick={onClose} aria-label="Close train details">×</button></div><p>Speed: {speedText(train.speed, 'Unknown')} · {train.source}</p>
     {upcoming && <div className="next-stop" aria-live="polite"><small>{upcoming.label}{state.error ? ' · stale data' : ''}</small><h3>{stopName(upcoming.stop)}</h3><div className="next-stop-meta"><span>{upcoming.action} <b>{time(upcoming.event.actualTime || upcoming.event.plannedTime)}</b></span><span className={track.changed ? 'track-changed' : ''}>Platform / spoor <b>{track.value}</b>{track.changed && <small>Changed from {track.planned}</small>}</span></div><p>Based on reported times, not confirmed by GPS.{state.updated && ` Checked ${time(state.updated)}.`}</p></div>}
     {!upcoming && state.stops?.length > 0 && <p>No upcoming timed stop reported. The journey may have ended or its timing data may be incomplete.</p>}
     {following && <p><strong>Then: {stopName(following.stop)}</strong> · {following.action.toLowerCase()} {time(following.event.actualTime || following.event.plannedTime)} · Platform / spoor {platform(following.event).value}</p>}
@@ -143,7 +146,8 @@ export default function App() {
     navigator.geolocation.getCurrentPosition(p => { const center = [p.coords.latitude, p.coords.longitude]; setLocation(center); changeArea(center, 'your location'); }, () => setNotice('Could not access your location. Choose a station or move the map instead.'), { timeout: 10000, maximumAge: 60000 });
   }
   const visible = feed.trains.filter(t => (filter === 'All' || trainStyle(t.type).label === filter) && t.name.toLowerCase().includes(search.toLowerCase()));
-  const nearbyStations = stations.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng) && distance(area.center, [s.lat, s.lng]) <= radius);
+  const nearbyStations = useMemo(() => stations.filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lng) && distance(area.center, [s.lat, s.lng]) <= radius), [stations, area.center, radius]);
+  const stationOptions = useMemo(() => stations.filter(s => s.land === 'NL' && Number.isFinite(s.lat) && Number.isFinite(s.lng)).sort((a, b) => (a.namen?.lang || '').localeCompare(b.namen?.lang || '')), [stations]);
   const selectedTrain = feed.trains.find(t => t.id === selected?.id) || selected;
   const live = feed.status === 'live';
   const routeState = journey.number === selectedNumber ? journey : { loading: Boolean(selectedNumber) };
@@ -151,13 +155,13 @@ export default function App() {
   const routeColor = trainStyle(selectedTrain?.type).color;
   const upcoming = nextCall(routeState.stops, clock);
   return <div className="app"><header><div className="brand"><TrainFront size={25}/><div><b>RailRadar <span>NL</span></b><small>Netherlands · passenger train tracker</small></div></div><span className={`status ${live ? 'live' : ''}`} role="status">{live ? '● NS LIVE FEED' : feed.status === 'connecting' ? '● CONNECTING' : feed.status === 'stale' ? '● STALE POSITIONS' : '● FEED UNAVAILABLE'}</span></header>
-    <main><section className="map" aria-label="Train map"><MapContainer center={HAGUE} zoom={12} style={{ height: '100%', width: '100%' }}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" referrerPolicy="strict-origin-when-cross-origin"/><MapActions center={area.center} onSearchHere={setViewport}/>
+    <main><section className="map" aria-label="Train map"><MapContainer center={HAGUE} zoom={12} style={{ height: '100%', width: '100%' }}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" referrerPolicy="strict-origin-when-cross-origin"/><MapActions center={area.center} radius={radius} onSearchHere={setViewport}/>
       {(showTracks || showCrossings) && <RailInfrastructure tracks={showTracks} crossings={showCrossings} onStatus={setRailStatus}/>}
       {showInternational && <International stations={stations} onSelect={setSelected}/>}
       <Circle center={area.center} radius={radius} pathOptions={{ color: '#137e80', fillOpacity: .025, weight: 1, dashArray: '5 6' }}/>
       {selectedTrain && <RouteLayer key={selectedTrain.id} geometry={geometry} color={routeColor} fitRequest={fitRequest}/>}
       {nearbyStations.map(s => <Marker key={s.code} position={[s.lat, s.lng]} icon={stationIcon}><Popup>{s.namen?.lang || s.code}</Popup></Marker>)}
-      {visible.map(t => <Marker key={t.id} position={t.pos} icon={trainIcon(t.type, selected?.id === t.id, t.heading)} title={`${t.name} — ${trainStyle(t.type).label} · ${headingLabel(t.heading)}`} alt={`${t.name} — ${trainStyle(t.type).label}`} zIndexOffset={selected?.id === t.id ? 1000 : 100} opacity={live ? 1 : .45} eventHandlers={{ click: () => setSelected(t) }}><Popup><b>{t.name}</b><br/>{t.speed === null ? 'Speed unknown' : `${t.speed} km/h`}<br/>{live ? 'NS-reported position' : 'Last known position — stale'}<br/>{headingLabel(t.heading)}<br/><button onClick={() => setSelected(t)}>View route details</button></Popup></Marker>)}
+      {visible.map(t => <Marker key={t.id} position={t.pos} icon={trainIcon(t.type, selected?.id === t.id, t.heading)} title={`${t.name} — ${trainStyle(t.type).label} · ${headingLabel(t.heading)}`} alt={`${t.name} — ${trainStyle(t.type).label}`} zIndexOffset={selected?.id === t.id ? 1000 : 100} opacity={live ? 1 : .45} eventHandlers={{ click: () => setSelected(t) }}><Popup><b>{t.name}</b><br/>{speedText(t.speed)}<br/>{live ? 'NS-reported position' : 'Last known position — stale'}<br/>{headingLabel(t.heading)}<br/><button onClick={() => setSelected(t)}>View route details</button></Popup></Marker>)}
       {location && <CircleMarker center={location} radius={7} pathOptions={{ color: '#fff', fillColor: '#2563eb', fillOpacity: 1 }}><Popup>Your location</Popup></CircleMarker>}
     </MapContainer><button className="search-map" onClick={() => changeArea(viewport, 'selected map area')}><MapPin size={15}/> Search this map area</button><div className="maptag">{live ? `NS-reported positions · updated ${time(feed.updated)}` : feed.updated ? `Stale positions · last update ${time(feed.updated)}` : 'No live data · no sample trains shown'}</div></section>
     <aside ref={sidebar}>
@@ -165,17 +169,17 @@ export default function App() {
       {selectedTrain && <Journey key={selectedTrain.id} train={selectedTrain} stations={stations} state={routeState} upcoming={upcoming} hasRoute={geometry.segments.length > 0} onFit={() => setFitRequest(n => n + 1)} onClose={() => setSelected(null)}/>}
       <div className="intro"><h1>Trains around {area.label}</h1><p>Explore passenger trains, inspect their stops, and see recent observations near your chosen location.</p></div>
       <fieldset className="rail-layers international-controls"><legend>International services</legend><label><input type="checkbox" checked={showInternational} onChange={e => setShowInternational(e.target.checked)}/> International departure stations</label><p>Red INT badges show departures, not live train positions. Coverage: Amsterdam Centraal, Amsterdam Zuid, Schiphol Airport, Rotterdam Centraal and Arnhem Centraal. Select a departure to open its route.</p><div className="controls"><button onClick={() => { setShowInternational(true); changeArea([51.9244, 4.4697], 'Rotterdam Centraal'); }}>Rotterdam</button><button onClick={() => { setShowInternational(true); changeArea([52.378, 4.9003], 'Amsterdam Centraal'); }}>Amsterdam</button></div><p>International GPS coverage is incomplete. No train positions are estimated or invented.</p></fieldset>
-      <label className="field">Jump to a station<select value="" onChange={e => { const s = stations.find(s => s.code === e.target.value); if (s) changeArea([s.lat, s.lng], s.namen?.lang || s.code); }} disabled={!stations.length}><option value="">{stations.length ? 'Choose a station…' : 'Station list unavailable'}</option>{stations.filter(s => s.land === 'NL' && Number.isFinite(s.lat) && Number.isFinite(s.lng)).sort((a,b) => (a.namen?.lang || '').localeCompare(b.namen?.lang || '')).map(s => <option key={s.code} value={s.code}>{s.namen?.lang || s.code}</option>)}</select></label>
+      <label className="field">Jump to a station<select value="" onChange={e => { const s = stations.find(s => s.code === e.target.value); if (s) changeArea([s.lat, s.lng], s.namen?.lang || s.code); }} disabled={!stations.length}><option value="">{stations.length ? 'Choose a station…' : 'Station list unavailable'}</option>{stationOptions.map(s => <option key={s.code} value={s.code}>{s.namen?.lang || s.code}</option>)}</select></label>
       {stationError && <p className="muted">Station lookup unavailable; you can still search the map.</p>}
       <div className="controls"><button onClick={locate}><LocateFixed size={16}/> My location</button><button onClick={() => changeArea(HAGUE, 'Den Haag')}><MapPin size={16}/> Den Haag</button></div>
       <fieldset className="rail-layers"><legend>Railway map · ProRail / PDOK</legend><label><input type="checkbox" checked={showTracks} onChange={e => { setShowTracks(e.target.checked); setRailStatus('loading'); }}/> Railway tracks</label><label><input type="checkbox" checked={showCrossings} onChange={e => { setShowCrossings(e.target.checked); setRailStatus('loading'); }}/> Level crossings <small>Zoom in to see</small></label><p>Track detail increases as you zoom in. Infrastructure only; no live freight positions.</p>{(showTracks || showCrossings) && railStatus === 'error' && <p className="rail-error" role="status">Some railway tiles could not load. Train tracking remains available. Toggle the layer to retry.</p>}<a href="https://www.pdok.nl/introductie/-/article/spoorwegen" target="_blank" rel="noopener noreferrer">About this data ↗</a></fieldset>
       <label className="field">Search radius<select value={radius} onChange={e => setRadius(Number(e.target.value))}><option value={3000}>3 km</option><option value={12000}>12 km</option><option value={30000}>30 km</option></select></label>
       {notice && <p className="notice" role="status">{notice}</p>}{feed.error && <div className="notice error" role="alert">{feed.error}<button onClick={() => setRefresh(n => n + 1)}><RefreshCw size={14}/> Retry</button></div>}
-      <div className="marker-legend" aria-label="Train marker colors"><span className="ic">Intercity</span><span className="spr">Sprinter</span><span className="intl">International</span><span className="regional">Other</span></div><div className="sectiontitle"><TrainFront size={17}/> Positioned trains <span>{visible.length} in area</span></div><div className="filters">{['All','Intercity','Sprinter','International','Freight'].map(f => <button key={f} className={filter === f ? 'active' : ''} aria-pressed={filter === f} onClick={() => setFilter(f)}>{f}</button>)}</div>
+      <div className="marker-legend" aria-label="Train marker colors"><span className="ic">Intercity</span><span className="spr">Sprinter</span><span className="intl">International</span><span className="regional">Other</span></div><div className="sectiontitle"><TrainFront size={17}/> Positioned trains <span>{visible.length} in area</span></div><div className="filters">{FILTERS.map(([f, label]) => <button key={f} className={filter === f ? 'active' : ''} aria-pressed={filter === f} onClick={() => setFilter(f)}>{label}</button>)}</div>
       <label className="field">Find a train<input value={search} onChange={e => setSearch(e.target.value)} placeholder="Train number or type" type="search"/></label>
       {filter === 'International' && <p className="muted">This filter shows international services with reported coordinates. For additional services, use the red INT departure-station badges.</p>}
-      <div className="trainlist">{visible.map(t => <button className={`traincard ${selected?.id === t.id ? 'selected' : ''}`} key={t.id} onClick={() => setSelected(t)}><span className="trainhead"><strong>{t.name}</strong><span>{live ? t.type : 'Stale'}</span></span><span className="details"><span>{t.speed === null ? 'Speed unknown' : `${t.speed} km/h`}</span><span>View stops →</span></span></button>)}</div>
-      {!visible.length && <p className="empty">{filter === 'Freight' ? 'Freight tracking is not connected. The current feed provides passenger trains.' : feed.status === 'connecting' ? 'Connecting to NS…' : feed.status === 'error' ? 'Train positions are unavailable. Automatic retry runs every 15 seconds.' : search ? 'No trains match your search.' : 'No matching trains reported in this area.'}</p>}
+      <div className="trainlist">{visible.map(t => <button className={`traincard ${selected?.id === t.id ? 'selected' : ''}`} key={t.id} onClick={() => setSelected(t)}><span className="trainhead"><strong>{t.name}</strong><span>{live ? t.type : 'Stale'}</span></span><span className="details"><span>{speedText(t.speed)}</span><span>View stops →</span></span></button>)}</div>
+      {!visible.length && <p className="empty">{feed.status === 'connecting' ? 'Connecting to NS…' : feed.status === 'error' ? 'Train positions are unavailable. Automatic retry runs every 15 seconds.' : search ? 'No trains match your search.' : 'No matching trains reported in this area.'}</p>}
       <button className="history" aria-expanded={showHistory} onClick={() => setShowHistory(v => !v)}><History size={19}/> Recent sightings <span>{showHistory ? '−' : '+'}</span></button>
       {showHistory && <section className="historytext"><b>Observed within 3 km · last 30 minutes</b><p>Collected from map requests and enabled background alert locations. Sightings do not confirm an exact passing time. This temporary history resets when the server restarts; saved alert settings do not.</p>{historyError && <p role="alert">{historyError}</p>}{!historyError && !history.sightings.length && <p>No nearby sightings recorded yet.</p>}{history.sightings.map(t => <div className="sighting" key={t.id}><strong>{t.name}</strong><span>{time(t.lastSeen)} · closest {(t.closestMeters / 1000).toFixed(1)} km</span></div>)}{history.limited && <p>High activity: older observations may have been trimmed.</p>}</section>}
       <div className="foot"><Info size={16}/><span>NS positions may be delayed or inaccurate. Map refreshes every 15 seconds after each response. Background alerts monitor only enabled saved locations. Freight is not connected. Never use for railway operations.</span></div>

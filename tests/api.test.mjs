@@ -39,3 +39,13 @@ test('international boards constrain stations, cache requests and keep the key s
  assert.equal((await get('bad')).status,400);assert.equal(calls,1);
  assert.ok(!(await (await get('asd')).text()).includes('fixture-secret'));
 });
+test('nearby map searches share one snapped, widened NS vehicle request', async () => {
+ const urls=[];
+ const handle=createHandler({key:'fixture',fetcher:async url=>{urls.push(url);return Response.json({payload:{treinen:[]}});}});
+ assert.equal((await handle(new Request('https://example.test/api/vehicles?lat=52.0812&lng=4.3123&radius=3000'))).status,200);
+ assert.equal((await handle(new Request('https://example.test/api/vehicles?lat=52.0789&lng=4.3141&radius=3000'))).status,200);
+ assert.equal(urls.length,1);
+ assert.equal(urls[0].searchParams.get('lat'),'52.08');assert.equal(urls[0].searchParams.get('lng'),'4.31');assert.equal(urls[0].searchParams.get('radius'),'4000');
+ await handle(new Request('https://example.test/api/vehicles?lat=52&lng=5&radius=30000'));
+ assert.equal(urls[1].searchParams.get('radius'),'30000');
+});
