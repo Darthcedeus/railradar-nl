@@ -19,12 +19,17 @@ export function withHeadings(trains, previous = [], elapsedMs) {
     return { ...train, heading };
   });
 }
+// Sprites are drawn in 16 views (every 22.5°) so trains line up better with curving track.
+export const VIEWS = 16;
+export const viewIndex = heading => Number.isFinite(heading) ? Math.round(((heading % 360) + 360) % 360 / (360 / VIEWS)) % VIEWS : 6;
+// Speed band for motion streaks: 0 = none (unknown, stopped or direction unknown), 1 = moving, 2 = fast.
+export const paceBand = (speed, heading) => !Number.isFinite(heading) || !Number.isFinite(speed) || speed < 15 ? 0 : speed < 90 ? 1 : 2;
 export const directionIndex = heading => Number.isFinite(heading) ? Math.round(((heading % 360) + 360) % 360 / 45) % 8 : 3;
 export const headingLabel = heading => Number.isFinite(heading) ? `Last movement: ${['N','NE','E','SE','S','SW','W','NW'][directionIndex(heading)]} (estimated)` : 'Direction not yet known';
 
 // Orthographic, elevated views of a coupled two-car train. All geometry is local
 // to the train; its roof remains upright as the eight bearing views change.
-export function trainSprite(type, heading, selected = false) {
+export function trainSprite(type, heading, selected = false, pace = 0) {
   const { key } = trainStyle(type);
   const [body, dark, roof, stripe] = {
     intercity: ['#ffca28', '#c38b13', '#fff1aa', '#1556a0'],
@@ -32,7 +37,7 @@ export function trainSprite(type, heading, selected = false) {
     international: ['#eff1f4', '#a4b2c1', '#ffffff', '#d72f46'],
     regional: ['#e6f5ef', '#89b8aa', '#f7fffb', '#128879']
   }[key];
-  const angle = directionIndex(heading) * Math.PI / 4;
+  const angle = viewIndex(heading) * 2 * Math.PI / VIEWS;
   const dx = Math.sin(angle), dy = -Math.cos(angle);
   const px = Math.cos(angle), py = Math.sin(angle);
   const height = key === 'intercity' ? 17 : 13;
@@ -46,7 +51,14 @@ export function trainSprite(type, heading, selected = false) {
   const dot = (p, r, fill) => `<circle cx="${p[0]}" cy="${p[1]}" r="${r}" fill="${fill}"/>`;
   const lerp = (a,b,t) => a.map((v,i)=>v+(b[i]-v)*t);
   let svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 112" width="128" height="112" aria-hidden="true">';
-  if (selected) svg += '<ellipse cx="64" cy="65" rx="55" ry="38" fill="#e4fbff" fill-opacity=".65" stroke="#128c99" stroke-width="1.6" stroke-dasharray="3 4"/>';
+  if (selected) svg += '<ellipse class="halo" cx="64" cy="65" rx="55" ry="38" fill="#e4fbff" fill-opacity=".55" stroke="#128c99" stroke-width="1.6" stroke-dasharray="3 4"/>';
+  // Motion streaks trail the rear car; longer when the train is fast.
+  if (pace) {
+    const length = pace === 2 ? 11 : 6, z = height * .55;
+    for (const [y, start, opacity] of [[-4.2, 51, .75], [0, 53, .55], [4.2, 51, .75]]) {
+      svg += `<g class="streak" opacity="${opacity}">` + line([point(-start, y, z), point(-start - length, y, z)], '#557086', 1.5) + '</g>';
+    }
+  }
   // Shadow and the flexible gangway join the cars into one train silhouette.
   svg += '<g opacity=".18">' + poly([point(-49,-7),point(49,-7),point(49,7),point(-49,7)].map(([x,y])=>[x+2,y+4]), '#20374d','none') + '</g>';
   svg += poly([point(-3,-4,3),point(3,-4,3),point(3,4,3),point(-3,4,3)],'#243645');

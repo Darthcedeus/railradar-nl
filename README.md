@@ -2,6 +2,8 @@
 
 A self-hosted Netherlands train tracker with live NS positions, route details, station departure boards, railway infrastructure overlays, and proximity push notifications. Train markers use directional, isometric railcar sprites; they represent service categories rather than exact rolling stock. International station markers show departure boards, not live train positions. Freight tracking is not available.
 
+The interface is available in English and Dutch (the **NL/EN** button; defaults to the browser language) and has light, dark and automatic themes (the sun/moon button). Select a train and tap **Follow train** to keep the map centred on it; dragging the map stops following. Markers glide between position reports, show estimated direction in 16 views, shrink when zoomed out, and show train numbers when zoomed in.
+
 ## Architecture
 
 One Node 24 service serves the React frontend and API and runs the background alert monitor. SQLite stores subscriptions, alert settings, VAPID keys, and duplicate-alert history in a persistent Docker volume. Run one application replica. A reverse proxy supplies public HTTPS.
