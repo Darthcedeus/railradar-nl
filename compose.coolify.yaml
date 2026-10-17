@@ -1,0 +1,26 @@
+services:
+  railradar:
+    build: .
+    platform: linux/amd64
+    restart: unless-stopped
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:?Set your public HTTPS origin in .env}
+      DATA_DIR: /data
+      PORT: "3000"
+    ports:
+      - "${BIND_IP:-127.0.0.1}:${HOST_PORT:-3000}:3000"
+    volumes:
+      - railradar_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+volumes:
+  railradar_data:
+    external: true
+    name: railradar-nl_railradar_data
