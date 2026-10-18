@@ -4,11 +4,14 @@ services:
     platform: linux/amd64
     restart: unless-stopped
     environment:
-      APP_ORIGIN: ${APP_ORIGIN:?Set your public HTTPS origin in .env}
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in Coolify}
+      NS_API_SUBSCRIPTION_KEY: ${NS_API_SUBSCRIPTION_KEY:?Set NS_API_SUBSCRIPTION_KEY in Coolify}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in Coolify}
+      POLL_SECONDS: ${POLL_SECONDS:-30}
       DATA_DIR: /data
       PORT: "3000"
     ports:
-      - "${BIND_IP:-127.0.0.1}:${HOST_PORT:-3000}:3000"
+      - "0.0.0.0:5005:3000"
     volumes:
       - railradar_data:/data
     read_only: true
