@@ -49,3 +49,9 @@ test('nearby map searches share one snapped, widened NS vehicle request', async 
  await handle(new Request('https://example.test/api/vehicles?lat=52&lng=5&radius=30000'));
  assert.equal(urls[1].searchParams.get('radius'),'30000');
 });
+test('departure boards also serve stations the operator lists', async () => {
+ const handle=createHandler({key:'k',departureStations:['gvm'],fetcher:async url=>Response.json({payload:{departures:[],station:url.searchParams.get('station')}})});
+ assert.equal((await handle(new Request('https://example.test/api/departures?station=gvm'))).status,200);
+ assert.equal((await handle(new Request('https://example.test/api/departures?station=asd'))).status,200);
+ assert.equal((await handle(new Request('https://example.test/api/departures?station=ut'))).status,400);
+});

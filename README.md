@@ -34,6 +34,7 @@ Setup asks for the public HTTPS origin, host bind IPv4, and NS subscription key.
 | `NS_API_SUBSCRIPTION_KEY` | NS API credential. |
 | `SESSION_SECRET` | Stable, random 64-character lowercase hexadecimal secret. |
 | `POLL_SECONDS` | Monitor interval, 15–300 seconds; default 30. |
+| `DEPARTURE_STATIONS` | Optional comma-separated NS station codes (for example `gvm,gv`) that `/api/departures?station=` also serves, besides the international hubs. Each board is cached for 60 seconds. |
 
 Configure HTTPS with your preferred reverse proxy. `Caddyfile.example` illustrates a proxy running directly on the same host. Use your own hostname and a reachable private upstream for other layouts. Restrict access to the app port to the proxy; only the HTTPS endpoint should be public. Do not cache API responses, HTML, the service worker, or the web manifest.
 

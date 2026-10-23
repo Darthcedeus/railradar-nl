@@ -2,7 +2,10 @@ import { normalizeVehicles, distance, HAGUE } from './data.mjs';
 import { INTERNATIONAL_HUBS } from './international-hubs.mjs';
 const NS_BASE = 'https://gateway.apiportal.ns.nl';
 const WINDOW = 30 * 60 * 1000;
-export function createHandler({ key, fetcher = fetch, now = Date.now } = {}) {
+export function createHandler({ key, fetcher = fetch, now = Date.now, departureStations = [] } = {}) {
+  // Departure boards are limited to the international hubs plus any stations
+  // the operator lists, so the public endpoint cannot spend NS quota freely.
+  const boards = new Set([...INTERNATIONAL_HUBS, ...departureStations]);
   const cache = new Map(), pending = new Map();
   let observations = [];
   const startedAt = now();
@@ -74,7 +77,7 @@ export function createHandler({ key, fetcher = fetch, now = Date.now } = {}) {
         ttl = 60000;
       } else if (url.pathname === '/api/departures') {
         const station = url.searchParams.get('station');
-        if (!INTERNATIONAL_HUBS.includes(station)) return send(400, { error: 'Choose a supported international hub.' });
+        if (!boards.has(station)) return send(400, { error: 'Choose a supported station.' });
         upstream = new URL('/reisinformatie-api/api/v2/departures', NS_BASE);
         upstream.searchParams.set('station', station); upstream.searchParams.set('maxJourneys', '100');
         ttl = 60000;

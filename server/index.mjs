@@ -17,7 +17,9 @@ const dir = resolve(process.env.DATA_DIR || 'data'); mkdirSync(dir, { recursive:
 const store = openStore(resolve(dir, 'railradar.sqlite'), () => webpush.generateVAPIDKeys());
 webpush.setVapidDetails(config.origin, store.vapid.publicKey, store.vapid.privateKey);
 const sendPush = (subscription, payload) => webpush.sendNotification(subscription, JSON.stringify(payload), { TTL: 60, urgency: 'high', timeout: 10000 });
-const ns = createHandler({ key: process.env.NS_API_SUBSCRIPTION_KEY });
+const departureStations = (process.env.DEPARTURE_STATIONS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+if (departureStations.some(s => !/^[a-z]{2,6}$/.test(s))) throw Error('DEPARTURE_STATIONS must be comma-separated NS station codes, e.g. gvm,gv.');
+const ns = createHandler({ key: process.env.NS_API_SUBSCRIPTION_KEY, departureStations });
 const monitor = createMonitor({ store, ns, sendPush, interval: seconds * 1000 });
 const server = createApp({ config, store, ns, monitor, sendPush });
 server.listen(Number(process.env.PORT || 3000), '0.0.0.0', () => { console.log('RailRadar listening; background monitor enabled.'); monitor.start(); });
