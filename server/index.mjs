@@ -17,8 +17,16 @@ const dir = resolve(process.env.DATA_DIR || 'data'); mkdirSync(dir, { recursive:
 const store = openStore(resolve(dir, 'railradar.sqlite'), () => webpush.generateVAPIDKeys());
 webpush.setVapidDetails(config.origin, store.vapid.publicKey, store.vapid.privateKey);
 const sendPush = (subscription, payload) => webpush.sendNotification(subscription, JSON.stringify(payload), { TTL: 60, urgency: 'high', timeout: 10000 });
-const departureStations = (process.env.DEPARTURE_STATIONS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-if (departureStations.some(s => !/^[a-z]{2,6}$/.test(s))) throw Error('DEPARTURE_STATIONS must be comma-separated NS station codes, e.g. gvm,gv.');
+// Optional extra departure boards. A bad entry is skipped with a warning rather
+// than stopping the server, so a typo here never takes the whole site down.
+const departureStations = [];
+for (const raw of (process.env.DEPARTURE_STATIONS || '').split(',')) {
+  const code = raw.trim().replace(/^["']|["']$/g, '').trim().toLowerCase();
+  if (!code) continue;
+  if (/^[a-z]{2,6}$/.test(code)) departureStations.push(code);
+  else console.warn(`Ignoring DEPARTURE_STATIONS entry ${JSON.stringify(raw)}: expected an NS station code such as gvm.`);
+}
+if (departureStations.length) console.log(`Extra departure boards: ${departureStations.join(', ')}`);
 const ns = createHandler({ key: process.env.NS_API_SUBSCRIPTION_KEY, departureStations });
 const monitor = createMonitor({ store, ns, sendPush, interval: seconds * 1000 });
 const server = createApp({ config, store, ns, monitor, sendPush });
