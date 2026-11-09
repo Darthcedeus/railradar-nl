@@ -6,7 +6,7 @@ The interface is available in English and Dutch (the **NL/EN** button; defaults 
 
 ## Architecture
 
-One Node 24 service serves the React frontend and API and runs the background alert monitor. SQLite stores subscriptions, alert settings, VAPID keys, and duplicate-alert history in a persistent Docker volume. Run one application replica. A reverse proxy supplies public HTTPS.
+One Node 26 service serves the React frontend and API and runs the background alert monitor. SQLite stores subscriptions, alert settings, VAPID keys, and duplicate-alert history in a persistent Docker volume. Run one application replica. A reverse proxy supplies public HTTPS.
 
 The map is public. Browser-specific cookies protect alert management; each browser can only manage its own subscriptions. NS credentials stay on the server.
 
@@ -18,7 +18,7 @@ Clone this repository and enter its checkout directory. For a new installation, 
 
 ```bash
 docker run --rm -it --user "$(id -u):$(id -g)" \
-  -v "$PWD:/app" -w /app node:24-bookworm-slim \
+  -v "$PWD:/app" -w /app node:26-bookworm-slim \
   node scripts/setup.mjs
 docker compose up -d --build
 docker compose ps
@@ -106,13 +106,13 @@ docker compose logs --tail=80 railradar
 
 Do not rerun setup: preserve `.env` and the Docker volume. Keep the checkout directory name stable, as Compose uses it to name the project's volume. If Git reports local changes or diverging history, review them rather than force-resetting the checkout. Never use `git clean -x` here: it could remove your ignored `.env` and backups.
 
-For base-image security updates use `docker compose build --pull` followed by `docker compose up -d`. The lockfile pins JS dependencies; the Node 24 Docker tag receives upstream patches. Audit and update dependencies periodically.
+For base-image security updates use `docker compose build --pull` followed by `docker compose up -d`. The lockfile pins JS dependencies; the Node 26 Docker tag receives upstream patches. Audit and update dependencies periodically.
 
 Keep `SESSION_SECRET` stable across rebuilds. Rotating it invalidates browser management cookies; phones will need to enable alerts again to recover control of existing subscriptions. It does not stop existing push delivery. Avoid pasting credentials into shell history.
 
 ## Development checks
 
-With Node 24:
+With Node 26:
 
 ```bash
 npm ci
